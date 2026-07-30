@@ -50,10 +50,14 @@ function loadGameState(): GameState {
 function saveGameState(state: GameState): boolean {
   try {
     currentGameState = { ...state, lastUpdated: new Date().toISOString() };
-    fs.writeFileSync(STATE_FILE, JSON.stringify(currentGameState, null, 2), 'utf-8');
+    fs.writeFile(STATE_FILE, JSON.stringify(currentGameState, null, 2), 'utf-8', (err) => {
+      if (err) {
+        console.error('[Server] Error saving game state to disk:', err);
+      }
+    });
     return true;
   } catch (err) {
-    console.error('[Server] Error saving game state to disk:', err);
+    console.error('[Server] Error saving game state:', err);
     return false;
   }
 }
