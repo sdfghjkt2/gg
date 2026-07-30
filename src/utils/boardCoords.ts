@@ -95,11 +95,11 @@ export function get4PTokenCenter(playerIndex: number, step: number, tokenId: num
     const slots = YARD_POSITIONS_4P[playerIndex];
     return slots[tokenId % slots.length] || slots[0];
   }
-  if (step >= 57) {
+  if (step >= 56) {
     return HOME_FINISH_4P[playerIndex];
   }
-  if (step >= 52) {
-    const stretchIdx = step - 52;
+  if (step >= 51) {
+    const stretchIdx = step - 51;
     const gridPt = HOME_STRETCH_4P_GRID[playerIndex][stretchIdx];
     return {
       x: gridPt.x * CELL_SIZE_4P + CELL_SIZE_4P / 2,

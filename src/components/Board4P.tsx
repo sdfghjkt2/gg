@@ -321,9 +321,9 @@ export const Board4P: React.FC<Board4PProps> = ({
 
               const displayStep = isOverridden ? overrideTokenPos.step : t.step;
 
-              if (displayStep >= 0 && displayStep < 57) {
+              if (displayStep >= 0 && displayStep < 56) {
                 let tileKey = '';
-                if (displayStep >= 52) {
+                if (displayStep >= 51) {
                   tileKey = `home_${p.id}_${displayStep}`;
                 } else {
                   const offset = getStartOffset(gameState.mode, p.id);
@@ -338,41 +338,81 @@ export const Board4P: React.FC<Board4PProps> = ({
             });
           });
 
-          return gameState.players.map((player) => {
-            const pColor = getColorHex(player.color);
-
+          // Flatten all tokens to render and sort moveable tokens LAST (drawn on top in SVG Z-order)
+          const allTokensList = gameState.players.flatMap((player) => {
             return player.tokens.map((token) => {
               const isCurrentPlayer = player.id === gameState.activePlayerIndex;
               const isMoveable = isCurrentPlayer && validTokenIds.includes(token.id) && gameState.hasRolled && !isAnimating;
+              return { player, token, isMoveable };
+            });
+          });
 
-              const isOverridden =
-                overrideTokenPos &&
-                overrideTokenPos.playerIndex === player.id &&
-                overrideTokenPos.tokenId === token.id;
+          // Sort so moveable tokens are drawn last (on top)
+          allTokensList.sort((a, b) => {
+            if (a.isMoveable && !b.isMoveable) return 1;
+            if (!a.isMoveable && b.isMoveable) return -1;
+            return 0;
+          });
 
-              const displayStep = isOverridden ? overrideTokenPos.step : token.step;
-              const baseCenter = get4PTokenCenter(player.id, displayStep, token.id);
+          return allTokensList.map(({ player, token, isMoveable }) => {
+            const pColor = getColorHex(player.color);
 
-              let tileKey = '';
-              if (displayStep >= 0 && displayStep < 52) {
-                const offset = getStartOffset(gameState.mode, player.id);
-                const globalPos = (offset + displayStep) % 52;
-                tileKey = `main_${globalPos}`;
-              } else if (displayStep >= 52 && displayStep < 57) {
-                tileKey = `home_${player.id}_${displayStep}`;
-              }
+            const isOverridden =
+              overrideTokenPos &&
+              overrideTokenPos.playerIndex === player.id &&
+              overrideTokenPos.tokenId === token.id;
 
-              const stackedTokens = tileKey ? tileTokenMap.get(tileKey) || [] : [];
-              const stackCount = stackedTokens.length;
-              const stackedIndex = stackedTokens.findIndex(
-                (st) => st.playerIndex === player.id && st.tokenId === token.id
-              );
+            const displayStep = isOverridden ? overrideTokenPos.step : token.step;
+            const baseCenter = get4PTokenCenter(player.id, displayStep, token.id);
 
-              let dx = 0;
-              let dy = 0;
-              let scaleFactor = 1.0;
+            let tileKey = '';
+            if (displayStep >= 0 && displayStep < 51) {
+              const offset = getStartOffset(gameState.mode, player.id);
+              const globalPos = (offset + displayStep) % 52;
+              tileKey = `main_${globalPos}`;
+            } else if (displayStep >= 51 && displayStep < 56) {
+              tileKey = `home_${player.id}_${displayStep}`;
+            }
 
-              if (stackCount > 1 && stackedIndex !== -1) {
+            const stackedTokens = tileKey ? tileTokenMap.get(tileKey) || [] : [];
+            const stackCount = stackedTokens.length;
+            const stackedIndex = stackedTokens.findIndex(
+              (st) => st.playerIndex === player.id && st.tokenId === token.id
+            );
+
+            let dx = 0;
+            let dy = 0;
+            let scaleFactor = 1.0;
+
+            if (stackCount > 1 && stackedIndex !== -1) {
+              if (isMoveable) {
+                // ON PLAYER'S TURN: Enlarge stacked token (1.25x) and pop forward above stack
+                const moveableOnSameTile = stackedTokens.filter((st) => {
+                  const p = gameState.players.find((pl) => pl.id === st.playerIndex);
+                  const t = p?.tokens.find((tk) => tk.id === st.tokenId);
+                  return (
+                    st.playerIndex === gameState.activePlayerIndex &&
+                    t &&
+                    validTokenIds.includes(t.id) &&
+                    gameState.hasRolled &&
+                    !isAnimating
+                  );
+                });
+
+                if (moveableOnSameTile.length <= 1) {
+                  scaleFactor = 1.25;
+                  dx = 0;
+                  dy = -8;
+                } else {
+                  const mIndex = moveableOnSameTile.findIndex(
+                    (m) => m.playerIndex === player.id && m.tokenId === token.id
+                  );
+                  scaleFactor = 1.15;
+                  dx = mIndex === 0 ? -10 : 10;
+                  dy = -8;
+                }
+              } else {
+                // Non-moveable token on stacked tile: normal scaled down layout
                 if (stackCount === 2) {
                   scaleFactor = 0.72;
                   dx = stackedIndex === 0 ? -7 : 7;
@@ -403,63 +443,69 @@ export const Board4P: React.FC<Board4PProps> = ({
                   scaleFactor = Math.max(0.38, 1 / (1 + (stackCount - 1) * 0.25));
                 }
               }
+            } else {
+              // Unstacked token: Always normal 1.0 scale (never enlarged when alone)
+              scaleFactor = 1.0;
+              dx = 0;
+              dy = 0;
+            }
 
-              const x = baseCenter.x + dx;
-              const y = baseCenter.y + dy;
+            const x = baseCenter.x + dx;
+            const y = baseCenter.y + dy;
 
-              return (
-                <motion.g
-                  key={`token-${player.id}-${token.id}`}
-                  animate={{
-                    x,
-                    y,
-                  }}
-                  transition={{ type: 'spring', stiffness: 520, damping: 28 }}
-                  className={isMoveable ? 'cursor-pointer hover:scale-110 transition-transform' : ''}
-                  onClick={() => {
-                    if (isMoveable) onTokenClick(token.id);
-                  }}
-                >
-                  {/* Invisible enlarged hit target for mobile touch support */}
-                  <circle
+            return (
+              <motion.g
+                key={`token-${player.id}-${token.id}`}
+                animate={{
+                  x,
+                  y,
+                }}
+                transition={{ type: 'spring', stiffness: 520, damping: 28 }}
+                className={isMoveable ? 'cursor-pointer hover:scale-110 transition-transform' : ''}
+                onClick={() => {
+                  if (isMoveable) onTokenClick(token.id);
+                }}
+              >
+                {/* Invisible enlarged hit target for mobile touch support */}
+                <circle
+                  cx={0}
+                  cy={-5}
+                  r={28}
+                  fill="transparent"
+                  pointerEvents="all"
+                />
+
+                {/* Active Pulsing Ring */}
+                {isMoveable && (
+                  <motion.circle
                     cx={0}
-                    cy={-5}
-                    r={Math.max(20, 26 * scaleFactor)}
-                    fill="transparent"
-                    pointerEvents="all"
+                    cy={0}
+                    r={24 * scaleFactor}
+                    fill="none"
+                    stroke="#38bdf8"
+                    strokeWidth={3.5}
+                    animate={{ r: [20 * scaleFactor, 26 * scaleFactor, 20 * scaleFactor], opacity: [0.9, 0.4, 0.9] }}
+                    transition={{ repeat: Infinity, duration: 1.2 }}
                   />
+                )}
 
-                  {/* Active Pulsing Ring */}
-                  {isMoveable && (
-                    <motion.circle
-                      cx={0}
-                      cy={0}
-                      r={24 * scaleFactor}
-                      fill="none"
-                      stroke="#38bdf8"
-                      strokeWidth={3.5}
-                      animate={{ r: [20 * scaleFactor, 26 * scaleFactor, 20 * scaleFactor], opacity: [0.9, 0.4, 0.9] }}
-                      transition={{ repeat: Infinity, duration: 1.2 }}
-                    />
-                  )}
-
-                  {/* 3D Teardrop Token Pin with Wobbly Tile Jump Effect */}
-                  <motion.g
-                    animate={
-                      isOverridden
-                        ? {
-                            y: [0, -20, -5, 0],
-                            rotate: [0, -16, 14, -6, 0],
-                            scaleX: [scaleFactor, scaleFactor * 0.78, scaleFactor * 1.28, scaleFactor * 0.88, scaleFactor],
-                            scaleY: [scaleFactor, scaleFactor * 1.35, scaleFactor * 0.78, scaleFactor * 1.15, scaleFactor],
-                          }
-                        : {
-                            y: 0,
-                            rotate: 0,
-                            scaleX: (isMoveable ? 1.18 : 1) * scaleFactor,
-                            scaleY: (isMoveable ? 1.18 : 1) * scaleFactor,
-                          }
-                    }
+                {/* 3D Teardrop Token Pin with Wobbly Tile Jump Effect */}
+                <motion.g
+                  animate={
+                    isOverridden
+                      ? {
+                          y: [0, -20, -5, 0],
+                          rotate: [0, -16, 14, -6, 0],
+                          scaleX: [scaleFactor, scaleFactor * 0.78, scaleFactor * 1.28, scaleFactor * 0.88, scaleFactor],
+                          scaleY: [scaleFactor, scaleFactor * 1.35, scaleFactor * 0.78, scaleFactor * 1.15, scaleFactor],
+                        }
+                      : {
+                          y: 0,
+                          rotate: 0,
+                          scaleX: scaleFactor,
+                          scaleY: scaleFactor,
+                        }
+                  }
                     transition={
                       isOverridden
                         ? { duration: 0.22, ease: 'easeOut' }
@@ -492,9 +538,8 @@ export const Board4P: React.FC<Board4PProps> = ({
                 </motion.g>
               );
             });
-          });
-        })()}
-      </svg>
+          })()}
+        </svg>
 
       {/* Interactive Dice mounted right in center of board */}
       <CenterDice

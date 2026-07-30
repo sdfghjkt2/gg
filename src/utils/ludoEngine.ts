@@ -18,9 +18,9 @@ export function getColorHex(color?: string) {
   return COLOR_HEX.red;
 }
 
-export const TRACK_LENGTH_4P = 52;
+export const TRACK_LENGTH_4P = 51;
 export const HOME_STRETCH_4P = 5;
-export const HOME_STEP_4P = TRACK_LENGTH_4P + HOME_STRETCH_4P; // 57
+export const HOME_STEP_4P = TRACK_LENGTH_4P + HOME_STRETCH_4P; // 56
 
 // Starting offset on global main track for each player
 export const START_OFFSET_4P: Record<number, number> = {
