@@ -564,66 +564,6 @@ export default function App() {
 
       {/* MAIN GAME CONTENT */}
       <main className="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-6 flex flex-col items-center gap-5">
-        {/* Active Turn Indicator Banner with Avatar */}
-        <div
-          className="w-full flex items-center justify-between bg-slate-900/90 border rounded-2xl p-3 px-4 shadow-xl transition"
-          style={{
-            borderColor: activeColor.main,
-            boxShadow: `0 0 20px ${activeColor.main}33`,
-          }}
-        >
-          <div className="flex items-center gap-3">
-            {/* Active Player Avatar Badge */}
-            <div
-              className="w-11 h-11 rounded-2xl flex items-center justify-center text-2xl shrink-0 border-2 shadow-lg relative animate-bounce"
-              style={{
-                backgroundColor: `${activeColor.dark}ee`,
-                borderColor: activeColor.main,
-                boxShadow: `0 0 14px ${activeColor.main}66`,
-              }}
-            >
-              {activePlayer?.avatar || ['🦊', '🐉', '⚡', '🚀'][gameState.activePlayerIndex] || '🎲'}
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 font-medium">Turn:</span>
-                <span
-                  className="font-black text-xs uppercase tracking-wide px-2 py-0.5 rounded-lg border text-white shadow-sm"
-                  style={{ backgroundColor: activeColor.dark, borderColor: activeColor.main }}
-                >
-                  {activePlayer?.name}
-                </span>
-              </div>
-              <div className="text-xs font-semibold text-slate-200 mt-0.5 flex items-center gap-2">
-                {gameState.turnPhase === 'roll' ? (
-                  <span className="text-emerald-400 flex items-center gap-1">
-                    🎲 {activePlayer?.type === 'bot' ? 'AI Bot rolling dice...' : 'Roll the dice!'}
-                  </span>
-                ) : gameState.turnPhase === 'move' ? (
-                  <span className="text-amber-300 flex items-center gap-1 font-bold">
-                    {gameState.currentRoll === 6 ? '🔥 SIX Rolled! Select token' : `🎯 Rolled ${gameState.currentRoll}! Select token`}
-                  </span>
-                ) : (
-                  <span className="text-slate-400">Turn ending...</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 text-xs">
-            {gameState.isAutoBotMode && (
-              <span className="text-[10px] bg-rose-950 text-rose-300 border border-rose-800 px-2.5 py-1 rounded-xl font-mono font-bold animate-pulse">
-                ⚡ AUTO-BOT ({gameState.botSpeedMs}ms)
-              </span>
-            )}
-
-            <div className="bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl text-slate-400 text-xs font-medium">
-              Sixes: <span className="font-bold text-amber-400">{gameState.consecutiveSixes}/3</span>
-            </div>
-          </div>
-        </div>
-
         {/* Ludo Board */}
         <Board4P
           gameState={gameState}
