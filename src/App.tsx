@@ -36,6 +36,18 @@ export default function App() {
     () => localStorage.getItem('ludo_custom_ghost_image') || defaultGhostImg
   );
 
+  // Custom Capture Sound effect state stored permanently in localStorage
+  const [customCaptureSoundUrl, setCustomCaptureSoundUrl] = useState<string | null>(
+    () => {
+      const stored = localStorage.getItem('ludo_custom_capture_sound');
+      if (stored) {
+        soundFx.setCustomCaptureSoundUrl(stored);
+        return stored;
+      }
+      return null;
+    }
+  );
+
   const handleUploadGhostImage = useCallback((url: string) => {
     setGhostImageUrl(url);
     try {
@@ -48,6 +60,26 @@ export default function App() {
   const handleResetGhostImage = useCallback(() => {
     setGhostImageUrl(defaultGhostImg);
     localStorage.removeItem('ludo_custom_ghost_image');
+  }, []);
+
+  const handleUploadCaptureSound = useCallback((url: string) => {
+    setCustomCaptureSoundUrl(url);
+    soundFx.setCustomCaptureSoundUrl(url);
+    try {
+      localStorage.setItem('ludo_custom_capture_sound', url);
+    } catch (e) {
+      console.error('Failed to store custom capture sound in localStorage', e);
+    }
+  }, []);
+
+  const handleResetCaptureSound = useCallback(() => {
+    setCustomCaptureSoundUrl(null);
+    soundFx.setCustomCaptureSoundUrl(null);
+    localStorage.removeItem('ludo_custom_capture_sound');
+  }, []);
+
+  const handleTestCaptureSound = useCallback(() => {
+    soundFx.testCaptureSound();
   }, []);
 
   // Modals state
@@ -599,6 +631,10 @@ export default function App() {
         ghostImageUrl={ghostImageUrl}
         onUploadGhostImage={handleUploadGhostImage}
         onResetGhostImage={handleResetGhostImage}
+        customCaptureSoundUrl={customCaptureSoundUrl}
+        onUploadCaptureSound={handleUploadCaptureSound}
+        onResetCaptureSound={handleResetCaptureSound}
+        onTestCaptureSound={handleTestCaptureSound}
       />
 
       <WinnerModal

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Settings, Play, Bot, User, RefreshCw, X, Zap, RotateCcw, Activity, Volume2, VolumeX, Ghost, Upload } from 'lucide-react';
+import React, { useState } from 'react';
+import { Settings, Play, Bot, User, RefreshCw, X, Zap, RotateCcw, Activity, Volume2, VolumeX, Ghost, Upload, Music, Volume2 as PlaySound } from 'lucide-react';
 import { GameState, BoardMode } from '../types';
 import { COLOR_HEX } from '../utils/ludoEngine';
 
@@ -17,6 +17,10 @@ interface SettingsModalProps {
   ghostImageUrl: string;
   onUploadGhostImage: (url: string) => void;
   onResetGhostImage: () => void;
+  customCaptureSoundUrl: string | null;
+  onUploadCaptureSound: (url: string) => void;
+  onResetCaptureSound: () => void;
+  onTestCaptureSound: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -33,6 +37,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   ghostImageUrl,
   onUploadGhostImage,
   onResetGhostImage,
+  customCaptureSoundUrl,
+  onUploadCaptureSound,
+  onResetCaptureSound,
+  onTestCaptureSound,
 }) => {
   if (!isOpen) return null;
 
@@ -317,6 +325,90 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <RotateCcw className="w-3 h-3" /> Reset
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 6. Custom Capture & Ghost Sound Effect (MP3, WAV, M4A, OGG) - AT BOTTOM OF SETTINGS */}
+          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="font-bold text-sm text-white flex items-center gap-2">
+                  <Music className="w-4 h-4 text-cyan-400" /> Custom Capture Sound Effect
+                </div>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  Upload custom audio (MP3, WAV, M4A, OGG, AAC) to play when a token is captured and ghost effect appears.
+                </div>
+              </div>
+
+              {/* Status & Test Button */}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={onTestCaptureSound}
+                  className="px-3 py-1.5 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/80 font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow"
+                  title="Test / Preview Capture Sound"
+                >
+                  <PlaySound className="w-3.5 h-3.5 text-cyan-400" /> Test Sound
+                </button>
+              </div>
+            </div>
+
+            {/* Audio URL Input field + Audio File Upload Button */}
+            <div className="flex flex-col gap-2 pt-2 border-t border-slate-800/80">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Paste direct audio URL (MP3, WAV, M4A)..."
+                  value={customCaptureSoundUrl && !customCaptureSoundUrl.startsWith('data:') ? customCaptureSoundUrl : ''}
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    if (val) onUploadCaptureSound(val);
+                  }}
+                  className="flex-1 bg-slate-900 border border-slate-800 focus:border-cyan-600 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none transition font-mono placeholder:text-slate-600"
+                />
+
+                <label className="cursor-pointer py-1.5 px-3 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-200 border border-cyan-800/80 font-bold text-xs rounded-xl transition text-center flex items-center gap-1.5 shrink-0 shadow">
+                  <Upload className="w-3.5 h-3.5 text-cyan-400" /> Upload Audio
+                  <input
+                    type="file"
+                    accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.webm"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                          const res = evt.target?.result as string;
+                          if (res) onUploadCaptureSound(res);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+
+              {/* Status info & Reset option */}
+              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                <span className="font-medium text-slate-400 flex items-center gap-1">
+                  Status:
+                  {customCaptureSoundUrl ? (
+                    <span className="text-emerald-400 font-bold">Custom Audio Active 🎵</span>
+                  ) : (
+                    <span className="text-slate-500 italic">Default Synthesized Hit Audio</span>
+                  )}
+                </span>
+
+                {customCaptureSoundUrl && (
+                  <button
+                    type="button"
+                    onClick={onResetCaptureSound}
+                    className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded transition flex items-center gap-1"
+                  >
+                    <RotateCcw className="w-3 h-3" /> Reset Sound
+                  </button>
+                )}
               </div>
             </div>
           </div>

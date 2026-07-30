@@ -3,9 +3,18 @@
 class SoundManager {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
+  private customCaptureSoundUrl: string | null = null;
 
   constructor() {
     // Lazy initialization on first user interaction
+  }
+
+  public setCustomCaptureSoundUrl(url: string | null) {
+    this.customCaptureSoundUrl = url;
+  }
+
+  public getCustomCaptureSoundUrl(): string | null {
+    return this.customCaptureSoundUrl;
   }
 
   private getContext(): AudioContext | null {
@@ -158,6 +167,56 @@ class SoundManager {
    * Capture hit impact sound (when capturing opponent's token)
    */
   public playCaptureHit() {
+    if (this.isMuted) return;
+
+    if (this.customCaptureSoundUrl) {
+      try {
+        const audio = new Audio(this.customCaptureSoundUrl);
+        audio.volume = 0.9;
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            console.warn('Failed playing custom capture audio, falling back to synth:', err);
+            this.playCaptureHitSynth();
+          });
+        }
+      } catch (e) {
+        console.warn('Error initiating custom capture sound:', e);
+        this.playCaptureHitSynth();
+      }
+    } else {
+      this.playCaptureHitSynth();
+    }
+  }
+
+  /**
+   * Preview / Test capture sound effect regardless of mute state
+   */
+  public testCaptureSound() {
+    if (this.customCaptureSoundUrl) {
+      try {
+        const audio = new Audio(this.customCaptureSoundUrl);
+        audio.volume = 0.9;
+        const p = audio.play();
+        if (p !== undefined) {
+          p.catch(() => this.playCaptureHitSynthForce());
+        }
+      } catch (_) {
+        this.playCaptureHitSynthForce();
+      }
+    } else {
+      this.playCaptureHitSynthForce();
+    }
+  }
+
+  private playCaptureHitSynthForce() {
+    const wasMuted = this.isMuted;
+    this.isMuted = false;
+    this.playCaptureHitSynth();
+    this.isMuted = wasMuted;
+  }
+
+  private playCaptureHitSynth() {
     const ctx = this.getContext();
     if (!ctx) return;
 
