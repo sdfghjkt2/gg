@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { GameState, Token } from '../types';
-import { COLOR_HEX, getColorHex, isSafeCell, getGlobalTrackPos, getStartOffset } from '../utils/ludoEngine';
+import { COLOR_HEX, getColorHex, isSafeCell, getGlobalTrackPos, getStartOffset, SAFE_SQUARES_4P, getSafeSquareInfo } from '../utils/ludoEngine';
 import {
   CELL_SIZE_4P,
   MAIN_TRACK_4P_GRID,
@@ -21,7 +21,10 @@ interface Board4PProps {
   onTokenClick: (tokenId: number) => void;
   onRollDice: () => void;
   isRolling: boolean;
-  overrideTokenPos?: { playerIndex: number; tokenId: number; step: number } | null;
+  overrideTokenPos?:
+    | Record<string, { playerIndex: number; tokenId: number; step: number }>
+    | { playerIndex: number; tokenId: number; step: number }
+    | null;
   captureEffectCell?: { x: number; y: number } | null;
   isAnimating?: boolean;
   ghostImageUrl?: string;
@@ -131,6 +134,7 @@ export const Board4P: React.FC<Board4PProps> = ({
           let cellFill = '#ffffff';
           let isStart = false;
           let isStar = starGlobalIndices.includes(idx);
+          const safeSq = getSafeSquareInfo(idx);
 
           if (idx === 0) {
             cellFill = COLOR_HEX.red.light;
@@ -150,6 +154,9 @@ export const Board4P: React.FC<Board4PProps> = ({
 
           return (
             <g key={`track-cell-${idx}`}>
+              {safeSq && (
+                <title>{`🛡️ ${safeSq.name} | ID: ${safeSq.id}`}</title>
+              )}
               <rect
                 x={x}
                 y={y}
@@ -311,17 +318,23 @@ export const Board4P: React.FC<Board4PProps> = ({
 
         {/* 5. PLAYER TOKENS */}
         {(() => {
+          const getOverrideForToken = (pId: number, tId: number) => {
+            if (!overrideTokenPos) return null;
+            if ('playerIndex' in overrideTokenPos) {
+              const single = overrideTokenPos as { playerIndex: number; tokenId: number; step: number };
+              return single.playerIndex === pId && single.tokenId === tId ? single : null;
+            }
+            const dict = overrideTokenPos as Record<string, { playerIndex: number; tokenId: number; step: number }>;
+            return dict[`${pId}_${tId}`] || null;
+          };
+
           // Pre-calculate tile occupancy map for tokens on main track and home stretch
           const tileTokenMap = new Map<string, Array<{ playerIndex: number; tokenId: number }>>();
 
           gameState.players.forEach((p) => {
             p.tokens.forEach((t) => {
-              const isOverridden =
-                overrideTokenPos &&
-                overrideTokenPos.playerIndex === p.id &&
-                overrideTokenPos.tokenId === t.id;
-
-              const displayStep = isOverridden ? overrideTokenPos.step : t.step;
+              const override = getOverrideForToken(p.id, t.id);
+              const displayStep = override ? override.step : t.step;
 
               if (displayStep >= 0 && displayStep < 56) {
                 let tileKey = '';
@@ -359,12 +372,9 @@ export const Board4P: React.FC<Board4PProps> = ({
           return allTokensList.map(({ player, token, isMoveable }) => {
             const pColor = getColorHex(player.color);
 
-            const isOverridden =
-              overrideTokenPos &&
-              overrideTokenPos.playerIndex === player.id &&
-              overrideTokenPos.tokenId === token.id;
-
-            const displayStep = isOverridden ? overrideTokenPos.step : token.step;
+            const override = getOverrideForToken(player.id, token.id);
+            const isOverridden = !!override;
+            const displayStep = override ? override.step : token.step;
             const baseCenter = get4PTokenCenter(player.id, displayStep, token.id);
 
             let tileKey = '';

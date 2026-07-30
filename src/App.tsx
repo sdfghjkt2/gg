@@ -10,6 +10,7 @@ import {
   getHomeStep,
   getGlobalTrackPos,
   isSafeCell,
+  findCapturedToken,
 } from './utils/ludoEngine';
 import { get4PTokenCenter } from './utils/boardCoords';
 import { soundFx } from './utils/soundEffects';
@@ -18,7 +19,8 @@ import { Board4P } from './components/Board4P';
 import { SetupModal } from './components/SetupModal';
 import { SettingsModal } from './components/SettingsModal';
 import { WinnerModal } from './components/WinnerModal';
-import { Settings, Play, Bot, RefreshCw, Sparkles, Dices, Volume2, VolumeX } from 'lucide-react';
+import { SafeSquaresModal } from './components/SafeSquaresModal';
+import { Settings, Play, Bot, RefreshCw, Sparkles, Dices, Volume2, VolumeX, Shield } from 'lucide-react';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -26,7 +28,9 @@ export default function App() {
   const [isRolling, setIsRolling] = useState<boolean>(false);
 
   // Step-by-step animation & sound states
-  const [overrideTokenPos, setOverrideTokenPos] = useState<{ playerIndex: number; tokenId: number; step: number } | null>(null);
+  const [overrideTokenPos, setOverrideTokenPos] = useState<
+    Record<string, { playerIndex: number; tokenId: number; step: number }> | null
+  >(null);
   const [captureEffectCell, setCaptureEffectCell] = useState<{ x: number; y: number } | null>(null);
   const [isAnimatingMove, setIsAnimatingMove] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(() => soundFx.getMuted());
@@ -85,6 +89,7 @@ export default function App() {
   // Modals state
   const [isSetupOpen, setIsSetupOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isRulesOpen, setIsRulesOpen] = useState<boolean>(false);
 
   const handleToggleMute = useCallback(() => {
     const next = soundFx.toggleMute();
@@ -187,12 +192,13 @@ export default function App() {
         let penaltyLog: string | null = null;
 
         if (roll === 6 && newConsecutiveSixes >= 3) {
-          penaltyLog = `⚠️ ${activePlayer.name} rolled THREE SIXES in a row! Turn forfeited!`;
           // Find next player
           let candidate = (activeIdx + 1) % prev.players.length;
           while (prev.players[candidate].hasFinished) {
             candidate = (candidate + 1) % prev.players.length;
           }
+          const nextPlayer = prev.players[candidate];
+          penaltyLog = `🚫 3 SIXES IN A ROW! ${activePlayer.name}'s 3rd six is killed and turn is forfeited! Turn passed to ${nextPlayer.name}.`;
           forcedNextPlayer = candidate;
           nextPhase = 'roll';
         }
@@ -257,7 +263,7 @@ export default function App() {
         return {
           ...prev,
           currentRoll: roll,
-          hasRolled: true,
+          hasRolled: penaltyLog ? false : true,
           consecutiveSixes: penaltyLog ? 0 : newConsecutiveSixes,
           activePlayerIndex: penaltyLog ? forcedNextPlayer : activeIdx,
           turnPhase: penaltyLog ? 'roll' : 'move',
@@ -298,23 +304,11 @@ export default function App() {
 
       const finalStep = forwardSteps[forwardSteps.length - 1];
 
-      // 2. Check if a token will be captured
-      let capturedInfo: { playerIndex: number; tokenId: number; startStep: number } | null = null;
-      const targetGlobalPos = getGlobalTrackPos(gameState.mode, activeIdx, finalStep);
-
-      if (targetGlobalPos !== null && !isSafeCell(gameState.mode, targetGlobalPos)) {
-        gameState.players.forEach((p, pIdx) => {
-          if (pIdx === activeIdx) return;
-          p.tokens.forEach((otherToken) => {
-            if (!otherToken.isFinished && otherToken.step >= 0) {
-              const otherGlobalPos = getGlobalTrackPos(gameState.mode, pIdx, otherToken.step);
-              if (otherGlobalPos === targetGlobalPos) {
-                capturedInfo = { playerIndex: pIdx, tokenId: otherToken.id, startStep: otherToken.step };
-              }
-            }
-          });
-        });
-      }
+      // 2. Check if a token will be captured using strict Ludo rules
+      const capRes = findCapturedToken(gameState.players, gameState.mode, activeIdx, finalStep);
+      const capturedInfo = capRes
+        ? { playerIndex: capRes.playerIdx, tokenId: capRes.tokenId, startStep: capRes.startStep }
+        : null;
 
       // 3. Calculate reverse path for captured token back to home yard
       const reverseSteps: number[] = [];
@@ -334,7 +328,9 @@ export default function App() {
       // 4. Step-by-step tile hopping forward animation
       for (let i = 0; i < forwardSteps.length; i++) {
         const currentStep = forwardSteps[i];
-        setOverrideTokenPos({ playerIndex: activeIdx, tokenId, step: currentStep });
+        setOverrideTokenPos({
+          [`${activeIdx}_${tokenId}`]: { playerIndex: activeIdx, tokenId, step: currentStep },
+        });
 
         if (token.step === -1) {
           soundFx.playYardExit();
@@ -360,14 +356,18 @@ export default function App() {
           setCaptureEffectCell(null);
         }, 2200);
 
+        const activeOverride = { playerIndex: activeIdx, tokenId, step: finalStep };
         const totalRev = reverseSteps.length;
         // Smooth bell curve trajectory: slow at start, quick in middle, slow at end
         for (let j = 0; j < totalRev; j++) {
           const revStep = reverseSteps[j];
           setOverrideTokenPos({
-            playerIndex: capturedInfo.playerIndex,
-            tokenId: capturedInfo.tokenId,
-            step: revStep,
+            [`${activeIdx}_${tokenId}`]: activeOverride,
+            [`${capturedInfo.playerIndex}_${capturedInfo.tokenId}`]: {
+              playerIndex: capturedInfo.playerIndex,
+              tokenId: capturedInfo.tokenId,
+              step: revStep,
+            },
           });
 
           // Normalized progress t between 0 and 1
@@ -389,8 +389,7 @@ export default function App() {
         }
       }
 
-      // 6. Finalize canonical game state & sync server
-      setOverrideTokenPos(null);
+      // 6. Finalize canonical game state FIRST before clearing override so active token stays fixed on finalStep
       updateStateAndSync((prev) => {
         const nextState = executeMove(prev, tokenId);
         if (nextState.status === 'ended') {
@@ -399,6 +398,9 @@ export default function App() {
         return nextState;
       });
 
+      // Micro-tick delay to allow React state transition to complete before removing override
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      setOverrideTokenPos(null);
       setIsAnimatingMove(false);
     },
     [gameState, isAnimatingMove, updateStateAndSync]
@@ -696,6 +698,11 @@ export default function App() {
           );
         }}
         onOpenSetup={() => setIsSetupOpen(true)}
+      />
+
+      <SafeSquaresModal
+        isOpen={isRulesOpen}
+        onClose={() => setIsRulesOpen(false)}
       />
     </div>
   );

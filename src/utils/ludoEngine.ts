@@ -18,7 +18,7 @@ export function getColorHex(color?: string) {
   return COLOR_HEX.red;
 }
 
-export const TRACK_LENGTH_4P = 51;
+export const TRACK_LENGTH_4P = 51; // 51 main track steps (0 to 50)
 export const HOME_STRETCH_4P = 5;
 export const HOME_STEP_4P = TRACK_LENGTH_4P + HOME_STRETCH_4P; // 56
 
@@ -30,8 +30,31 @@ export const START_OFFSET_4P: Record<number, number> = {
   3: 39,  // Blue
 };
 
-// Safe spots relative to global main track
-export const SAFE_SPOTS_4P = [0, 8, 13, 21, 26, 34, 39, 47];
+// Safe spots relative to global main track with unique IDs
+export interface SafeSquare {
+  id: string;
+  name: string;
+  globalPos: number;
+  type: 'start' | 'star';
+  color: PlayerColor;
+}
+
+export const SAFE_SQUARES_4P: SafeSquare[] = [
+  { id: 'SAFE_START_RED_0', name: 'Red Start Square (Tile 0)', globalPos: 0, type: 'start', color: 'red' },
+  { id: 'SAFE_STAR_RED_8', name: 'Red Star Square (Tile 8)', globalPos: 8, type: 'star', color: 'red' },
+  { id: 'SAFE_START_GREEN_13', name: 'Green Start Square (Tile 13)', globalPos: 13, type: 'start', color: 'green' },
+  { id: 'SAFE_STAR_GREEN_21', name: 'Green Star Square (Tile 21)', globalPos: 21, type: 'star', color: 'green' },
+  { id: 'SAFE_START_YELLOW_26', name: 'Yellow Start Square (Tile 26)', globalPos: 26, type: 'start', color: 'yellow' },
+  { id: 'SAFE_STAR_YELLOW_34', name: 'Yellow Star Square (Tile 34)', globalPos: 34, type: 'star', color: 'yellow' },
+  { id: 'SAFE_START_BLUE_39', name: 'Blue Start Square (Tile 39)', globalPos: 39, type: 'start', color: 'blue' },
+  { id: 'SAFE_STAR_BLUE_47', name: 'Blue Star Square (Tile 47)', globalPos: 47, type: 'star', color: 'blue' },
+];
+
+export const SAFE_SPOTS_4P = SAFE_SQUARES_4P.map((s) => s.globalPos);
+
+export function getSafeSquareInfo(globalPos: number): SafeSquare | undefined {
+  return SAFE_SQUARES_4P.find((sq) => sq.globalPos === globalPos);
+}
 
 export function getTrackLength(_mode?: BoardMode): number {
   return TRACK_LENGTH_4P;
@@ -52,19 +75,68 @@ export function getSafeSpots(_mode?: BoardMode): number[] {
 /**
  * Maps a token's internal step to global main track cell index (if on main track).
  * Returns null if token is in yard or in home stretch.
+ * Main track has 52 cells (indices 0..51). Tokens spend 51 steps (0..50) on main track.
  */
 export function getGlobalTrackPos(mode: BoardMode, playerIndex: number, step: number): number | null {
-  const trackLen = getTrackLength(mode);
-  if (step < 0 || step >= trackLen) return null;
+  if (step < 0 || step >= 51) return null;
   const offset = getStartOffset(mode, playerIndex);
-  return (offset + step) % trackLen;
+  return (offset + step) % 52;
 }
 
 /**
  * Checks if a global track position is a safe spot.
  */
 export function isSafeCell(mode: BoardMode, globalPos: number): boolean {
-  return getSafeSpots(mode).includes(globalPos);
+  if (mode === '4P') {
+    return SAFE_SQUARES_4P.some((sq) => sq.globalPos === globalPos);
+  }
+  return false;
+}
+
+/**
+ * Finds a captured token when `activeIdx` lands on `targetStep`.
+ * Enforces strict Ludo rules:
+ * 1. SAFE SQUARES RULE: On colored start tiles or star tiles, tokens CANNOT be captured under any circumstances.
+ * 2. SAME-PLAYER STACK RULE: If an opponent player has 2 or more of their OWN tokens on a non-safe tile,
+ *    they form a blockade/stack. An incoming opponent token CANNOT kill them and stacks alongside them instead.
+ * 3. SINGLE OPPONENT CAPTURE RULE: If an opponent player has EXACTLY 1 token on a non-safe tile,
+ *    that single token is captured and sent back to Yard.
+ */
+export function findCapturedToken(
+  players: Player[],
+  mode: BoardMode,
+  activeIdx: number,
+  targetStep: number
+): { playerIdx: number; tokenId: number; startStep: number } | null {
+  const globalPos = getGlobalTrackPos(mode, activeIdx, targetStep);
+  if (globalPos === null || isSafeCell(mode, globalPos)) {
+    return null; // On safe square or off main track -> immune to capture
+  }
+
+  for (let pIdx = 0; pIdx < players.length; pIdx++) {
+    if (pIdx === activeIdx) continue;
+    const opponent = players[pIdx];
+
+    // Find all active tokens of this opponent sitting on `globalPos`
+    const opponentTokensOnCell = opponent.tokens.filter((t) => {
+      if (t.isFinished || t.step < 0) return false;
+      const pos = getGlobalTrackPos(mode, pIdx, t.step);
+      return pos === globalPos;
+    });
+
+    // If opponent has 2 or more of their own tokens stacked on this non-safe tile,
+    // it forms a same-player stack -> immune from capture! Opponent token stacks alongside.
+    if (opponentTokensOnCell.length === 1) {
+      const capturedToken = opponentTokensOnCell[0];
+      return {
+        playerIdx: pIdx,
+        tokenId: capturedToken.id,
+        startStep: capturedToken.step,
+      };
+    }
+  }
+
+  return null;
 }
 
 export const DEFAULT_PLAYER_AVATARS: string[] = ['🦊', '🐉', '⚡', '🚀'];
@@ -204,21 +276,13 @@ export function executeMove(state: GameState, tokenId: number): GameState {
     newlyFinished = true;
   }
 
-  // Check captures if on main track
-  const globalPos = getGlobalTrackPos(state.mode, activeIdx, newStep);
-  if (globalPos !== null && !isSafeCell(state.mode, globalPos)) {
-    newPlayers.forEach((p, pIdx) => {
-      if (pIdx === activeIdx) return;
-      p.tokens.forEach((otherToken) => {
-        if (otherToken.isFinished || otherToken.step < 0) return;
-        const otherGlobalPos = getGlobalTrackPos(state.mode, pIdx, otherToken.step);
-        if (otherGlobalPos === globalPos) {
-          // CAPTURE!
-          otherToken.step = -1; // back to Yard
-          capturedTokenInfo = { playerIdx: pIdx, tokenId: otherToken.id };
-        }
-      });
-    });
+  // Check captures if on main track using strict findCapturedToken rules
+  const capturedInfo = findCapturedToken(newPlayers, state.mode, activeIdx, newStep);
+  if (capturedInfo) {
+    const capturedPlayer = newPlayers[capturedInfo.playerIdx];
+    const capturedToken = capturedPlayer.tokens[capturedInfo.tokenId];
+    capturedToken.step = -1; // Send back to Yard
+    capturedTokenInfo = { playerIdx: capturedInfo.playerIdx, tokenId: capturedInfo.tokenId };
   }
 
   // Check if active player finished all 4 tokens
@@ -355,20 +419,9 @@ export function selectBestBotMove(state: GameState, roll: number): number | null
 
     // 2. Capturing an opponent token
     const globalPos = getGlobalTrackPos(state.mode, activeIdx, targetStep);
-    if (globalPos !== null && !isSafeCell(state.mode, globalPos)) {
-      let causesCapture = false;
-      state.players.forEach((p, pIdx) => {
-        if (pIdx === activeIdx) return;
-        p.tokens.forEach((other) => {
-          if (!other.isFinished && other.step >= 0) {
-            const otherGlobalPos = getGlobalTrackPos(state.mode, pIdx, other.step);
-            if (otherGlobalPos === globalPos) {
-              causesCapture = true;
-            }
-          }
-        });
-      });
-      if (causesCapture) score += 500;
+    const captured = findCapturedToken(state.players, state.mode, activeIdx, targetStep);
+    if (captured) {
+      score += 500;
     }
 
     // 3. Exiting Yard on a 6
