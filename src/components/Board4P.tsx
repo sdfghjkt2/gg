@@ -144,6 +144,8 @@ export const Board4P: React.FC<Board4PProps> = ({
           } else if (idx === 39) {
             cellFill = COLOR_HEX.blue.light;
             isStart = true;
+          } else if (isStar) {
+            cellFill = '#fef3c7'; // Light golden background for Star safe tiles
           }
 
           return (

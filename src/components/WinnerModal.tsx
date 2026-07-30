@@ -7,9 +7,10 @@ import { COLOR_HEX, getColorHex } from '../utils/ludoEngine';
 interface WinnerModalProps {
   gameState: GameState;
   onNewGame: () => void;
+  onOpenSetup?: () => void;
 }
 
-export const WinnerModal: React.FC<WinnerModalProps> = ({ gameState, onNewGame }) => {
+export const WinnerModal: React.FC<WinnerModalProps> = ({ gameState, onNewGame, onOpenSetup }) => {
   useEffect(() => {
     // Fire confetti on mount safely with custom canvas instance to avoid missing getBoundingClientRect in iframes
     try {
@@ -108,13 +109,23 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({ gameState, onNewGame }
           })}
         </div>
 
-        {/* Action Button */}
-        <button
-          onClick={onNewGame}
-          className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black rounded-2xl shadow-xl shadow-emerald-900/40 flex items-center justify-center gap-2 transition"
-        >
-          <RotateCcw className="w-4 h-4" /> Start New Game
-        </button>
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full">
+          <button
+            onClick={onNewGame}
+            className="flex-1 w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black rounded-2xl shadow-xl shadow-emerald-900/40 flex items-center justify-center gap-2 transition"
+          >
+            <RotateCcw className="w-4 h-4" /> Play Again
+          </button>
+          {onOpenSetup && (
+            <button
+              onClick={onOpenSetup}
+              className="flex-1 w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-2xl border border-slate-700 transition flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-4 h-4 text-emerald-400" /> Game Setup
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

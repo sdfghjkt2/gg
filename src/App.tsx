@@ -91,12 +91,29 @@ export default function App() {
     setIsMuted(next);
   }, []);
 
-  // Load initial persisted game state from server
+  // Load initial persisted game state from server / localStorage fallback
   useEffect(() => {
+    let localState: GameState | null = null;
+    try {
+      const stored = localStorage.getItem('ludo_game_state');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.mode === '4P' && Array.isArray(parsed.players) && parsed.players.length === 4) {
+          localState = parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse localStorage game state:', e);
+    }
+
     fetch('/api/game/state')
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
         if (
+          data &&
           data.success &&
           data.state &&
           data.state.mode === '4P' &&
@@ -104,24 +121,34 @@ export default function App() {
           data.state.players.length === 4
         ) {
           setGameState(data.state);
+        } else if (localState) {
+          setGameState(localState);
         } else {
           setGameState(createInitialGameState('4P'));
         }
       })
       .catch((err) => {
-        console.error('Failed to fetch game state from server:', err);
-        setGameState(createInitialGameState('4P'));
+        console.warn('Could not connect to backend server, loaded state from local storage / fallback:', err);
+        setGameState(localState || createInitialGameState('4P'));
       })
       .finally(() => setIsLoading(false));
   }, []);
 
-  // Save game state to server whenever it changes
+  // Save game state to server & localStorage whenever it changes
   const saveStateToServer = useCallback((newState: GameState) => {
+    try {
+      localStorage.setItem('ludo_game_state', JSON.stringify(newState));
+    } catch (e) {
+      console.warn('Failed to save state to local storage:', e);
+    }
+
     fetch('/api/game/state', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state: newState }),
-    }).catch((err) => console.error('Error saving game state to server:', err));
+    }).catch((err) => {
+      console.warn('Backend server offline or unreachable (game state saved locally):', err?.message || err);
+    });
   }, []);
 
   // Helper to update state and sync to server
@@ -411,19 +438,40 @@ export default function App() {
     playerAvatars?: string[],
     playerNames?: string[]
   ) => {
+    setIsRolling(false);
+    setIsAnimatingMove(false);
+    setOverrideTokenPos(null);
+    setCaptureEffectCell(null);
+    setIsSetupOpen(false);
+    setIsSettingsOpen(false);
+
+    const localNewState = createInitialGameState(mode, playerTypes, playerAvatars, playerNames);
+    setGameState(localNewState);
+    try {
+      localStorage.setItem('ludo_game_state', JSON.stringify(localNewState));
+    } catch (e) {
+      console.warn('Failed to save reset game state to localStorage:', e);
+    }
+
     fetch('/api/game/reset', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode, playerTypes, playerAvatars, playerNames }),
     })
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
-        if (data.success && data.state) {
+        if (data && data.success && data.state) {
           setGameState(data.state);
         }
       })
-      .catch((err) => console.error('Error resetting game state:', err))
-      .finally(() => setIsSetupOpen(false));
+      .catch((err) => console.warn('Could not reset state on server (using local state):', err))
+      .finally(() => {
+        setIsSetupOpen(false);
+        setIsSettingsOpen(false);
+      });
   };
 
   // Reset server state
@@ -639,7 +687,15 @@ export default function App() {
 
       <WinnerModal
         gameState={gameState}
-        onNewGame={() => setIsSetupOpen(true)}
+        onNewGame={() => {
+          handleStartNewGame(
+            gameState?.mode || '4P',
+            gameState?.players?.map((p) => p.type) || ['human', 'bot', 'bot', 'bot'],
+            gameState?.players?.map((p) => p.avatar),
+            gameState?.players?.map((p) => p.name)
+          );
+        }}
+        onOpenSetup={() => setIsSetupOpen(true)}
       />
     </div>
   );
