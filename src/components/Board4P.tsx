@@ -11,7 +11,7 @@ import {
   get4PTokenCenter,
 } from '../utils/boardCoords';
 import { Star } from 'lucide-react';
-import { CenterDice } from './CenterDice';
+import { PlayerHomeDice } from './PlayerHomeDice';
 
 import defaultGhostImg from '../assets/images/ghost_capture_effect_1785335938319.jpg';
 
@@ -21,13 +21,11 @@ interface Board4PProps {
   onTokenClick: (tokenId: number) => void;
   onRollDice: () => void;
   isRolling: boolean;
-  overrideTokenPos?:
-    | Record<string, { playerIndex: number; tokenId: number; step: number }>
-    | { playerIndex: number; tokenId: number; step: number }
-    | null;
+  overrideTokenPos?: Array<{ playerIndex: number; tokenId: number; step: number }> | null;
   captureEffectCell?: { x: number; y: number } | null;
   isAnimating?: boolean;
   ghostImageUrl?: string;
+  playerLastRolls?: Record<number, number | null>;
 }
 
 export const Board4P: React.FC<Board4PProps> = ({
@@ -40,6 +38,7 @@ export const Board4P: React.FC<Board4PProps> = ({
   captureEffectCell,
   isAnimating = false,
   ghostImageUrl,
+  playerLastRolls,
 }) => {
   const activePlayer = gameState.players[gameState.activePlayerIndex];
   const activeColor = getColorHex(activePlayer?.color);
@@ -94,7 +93,7 @@ export const Board4P: React.FC<Board4PProps> = ({
   const starGlobalIndices = [8, 21, 34, 47];
 
   return (
-    <div className="relative w-full max-w-[620px] aspect-square mx-auto rounded-3xl bg-slate-900/80 p-3 backdrop-blur-md shadow-2xl border border-slate-700/60 flex items-center justify-center">
+    <div className="relative w-full max-w-[620px] aspect-square mx-auto rounded-3xl bg-slate-900/80 p-3 backdrop-blur-md shadow-2xl border border-slate-700/60 flex items-center justify-center mt-10 sm:mt-12 mb-24 sm:mb-28">
       <svg viewBox="0 0 600 600" className="w-full h-full rounded-2xl select-none overflow-visible">
         <defs>
           <filter id="tokenShadow" x="-30%" y="-30%" width="160%" height="160%">
@@ -255,8 +254,11 @@ export const Board4P: React.FC<Board4PProps> = ({
         {/* Blue Home Triangle */}
         <polygon points="240,360 300,300 360,360" fill={COLOR_HEX.blue.main} stroke="#1e40af" strokeWidth={2} />
 
-        {/* Center cutout background circle for Center Dice */}
-        <circle cx="300" cy="300" r="48" fill="#0f172a" stroke="#334155" strokeWidth={3} />
+        {/* Central Home Emblem */}
+        <circle cx="300" cy="300" r="44" fill="#0f172a" stroke="#334155" strokeWidth={3} />
+        <circle cx="300" cy="300" r="36" fill="#1e293b" stroke="#475569" strokeWidth={1.5} />
+        <text x="300" y="295" fontSize="20" textAnchor="middle" dominantBaseline="middle">👑</text>
+        <text x="300" y="318" fill="#f8fafc" fontSize="10" fontWeight="900" letterSpacing="1px" textAnchor="middle">HOME</text>
 
         {/* Capture Ghost & Explosion Effect */}
         {captureEffectCell && (
@@ -320,12 +322,7 @@ export const Board4P: React.FC<Board4PProps> = ({
         {(() => {
           const getOverrideForToken = (pId: number, tId: number) => {
             if (!overrideTokenPos) return null;
-            if ('playerIndex' in overrideTokenPos) {
-              const single = overrideTokenPos as { playerIndex: number; tokenId: number; step: number };
-              return single.playerIndex === pId && single.tokenId === tId ? single : null;
-            }
-            const dict = overrideTokenPos as Record<string, { playerIndex: number; tokenId: number; step: number }>;
-            return dict[`${pId}_${tId}`] || null;
+            return overrideTokenPos.find((o) => o.playerIndex === pId && o.tokenId === tId) || null;
           };
 
           // Pre-calculate tile occupancy map for tokens on main track and home stretch
@@ -553,17 +550,21 @@ export const Board4P: React.FC<Board4PProps> = ({
           })()}
         </svg>
 
-      {/* Interactive Dice mounted right in center of board */}
-      <CenterDice
-        currentRoll={gameState.currentRoll}
-        hasRolled={gameState.hasRolled}
-        isRolling={isRolling}
-        disabled={gameState.turnPhase === 'game_over'}
-        activeColor={activeColor.main}
-        activePlayerName={activePlayer?.name || ''}
-        isBot={activePlayer?.type === 'bot' || gameState.isAutoBotMode}
-        onRoll={onRollDice}
-      />
+      {/* 4 Split Player Home Dice (One on each player's home side) */}
+      {gameState.players.map((player, pIdx) => (
+        <PlayerHomeDice
+          key={`home-dice-${pIdx}`}
+          playerIndex={pIdx}
+          player={player}
+          isActiveTurn={pIdx === gameState.activePlayerIndex}
+          currentRoll={gameState.currentRoll}
+          lastRoll={playerLastRolls ? playerLastRolls[pIdx] ?? null : null}
+          hasRolled={gameState.hasRolled}
+          isRolling={isRolling}
+          disabled={gameState.turnPhase === 'game_over' || isAnimating}
+          onRoll={onRollDice}
+        />
+      ))}
     </div>
   );
 };

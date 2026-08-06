@@ -267,7 +267,7 @@ export function executeMove(state: GameState, tokenId: number): GameState {
   }
 
   targetToken.step = newStep;
-  let capturedTokenInfo: { playerIdx: number; tokenId: number } | null = null;
+  const capturedTokensInfo: { playerIdx: number; tokenId: number }[] = [];
   let newlyFinished = false;
 
   // Check home finish
@@ -276,13 +276,22 @@ export function executeMove(state: GameState, tokenId: number): GameState {
     newlyFinished = true;
   }
 
-  // Check captures if on main track using strict findCapturedToken rules
-  const capturedInfo = findCapturedToken(newPlayers, state.mode, activeIdx, newStep);
-  if (capturedInfo) {
-    const capturedPlayer = newPlayers[capturedInfo.playerIdx];
-    const capturedToken = capturedPlayer.tokens[capturedInfo.tokenId];
-    capturedToken.step = -1; // Send back to Yard
-    capturedTokenInfo = { playerIdx: capturedInfo.playerIdx, tokenId: capturedInfo.tokenId };
+  // Check captures if on main track
+  const globalPos = getGlobalTrackPos(state.mode, activeIdx, newStep);
+  if (globalPos !== null && !isSafeCell(state.mode, globalPos)) {
+    newPlayers.forEach((p, pIdx) => {
+      if (pIdx === activeIdx) return;
+      p.tokens.forEach((otherToken) => {
+        if (!otherToken.isFinished && otherToken.step >= 0) {
+          const otherGlobalPos = getGlobalTrackPos(state.mode, pIdx, otherToken.step);
+          if (otherGlobalPos === globalPos) {
+            // CAPTURE!
+            otherToken.step = -1; // back to Yard
+            capturedTokensInfo.push({ playerIdx: pIdx, tokenId: otherToken.id });
+          }
+        }
+      });
+    });
   }
 
   // Check if active player finished all 4 tokens
@@ -298,7 +307,7 @@ export function executeMove(state: GameState, tokenId: number): GameState {
   const isGameOver = activePlayersRemaining.length <= 1;
 
   // Determine turn bonus
-  const extraTurnGranted = (roll === 6 && state.consecutiveSixes < 3) || capturedTokenInfo !== null || newlyFinished;
+  const extraTurnGranted = (roll === 6 && state.consecutiveSixes < 3) || capturedTokensInfo.length > 0 || newlyFinished;
 
   let nextActiveIdx = activeIdx;
   let nextConsecutiveSixes = roll === 6 ? state.consecutiveSixes : 0;
@@ -346,15 +355,15 @@ export function executeMove(state: GameState, tokenId: number): GameState {
     });
   }
 
-  if (capturedTokenInfo) {
-    const oppName = newPlayers[capturedTokenInfo.playerIdx].name;
+  capturedTokensInfo.forEach((cap) => {
+    const oppName = newPlayers[cap.playerIdx].name;
     newLogs.unshift({
       id: `log-cap-${Date.now()}-${Math.random()}`,
       timestamp: now,
       type: 'capture',
-      message: `💥 CAPTURE! ${activePlayer.name} captured ${oppName}'s Token #${capturedTokenInfo.tokenId + 1} and sent it back to Yard! Bonus turn awarded!`,
+      message: `💥 CAPTURE! ${activePlayer.name} captured ${oppName}'s Token #${cap.tokenId + 1} and sent it back to Yard! Bonus turn awarded!`,
     });
-  }
+  });
 
   if (extraTurnGranted && !isGameOver) {
     newLogs.unshift({

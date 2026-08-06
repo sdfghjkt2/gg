@@ -26,11 +26,22 @@ export default function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRolling, setIsRolling] = useState<boolean>(false);
+  const [playerLastRolls, setPlayerLastRolls] = useState<Record<number, number | null>>({});
+
+  // Track each player's individual last roll for turn-based home dice
+  useEffect(() => {
+    if (gameState?.currentRoll !== null && gameState?.currentRoll !== undefined) {
+      setPlayerLastRolls((prev) => ({
+        ...prev,
+        [gameState.activePlayerIndex]: gameState.currentRoll,
+      }));
+    }
+  }, [gameState?.currentRoll, gameState?.activePlayerIndex]);
 
   // Step-by-step animation & sound states
   const [overrideTokenPos, setOverrideTokenPos] = useState<
-    Record<string, { playerIndex: number; tokenId: number; step: number }> | null
-  >(null);
+    Array<{ playerIndex: number; tokenId: number; step: number }>
+  >([]);
   const [captureEffectCell, setCaptureEffectCell] = useState<{ x: number; y: number } | null>(null);
   const [isAnimatingMove, setIsAnimatingMove] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(() => soundFx.getMuted());
@@ -304,20 +315,34 @@ export default function App() {
 
       const finalStep = forwardSteps[forwardSteps.length - 1];
 
-      // 2. Check if a token will be captured using strict Ludo rules
-      const capRes = findCapturedToken(gameState.players, gameState.mode, activeIdx, finalStep);
-      const capturedInfo = capRes
-        ? { playerIndex: capRes.playerIdx, tokenId: capRes.tokenId, startStep: capRes.startStep }
-        : null;
+      // 2. Check if one OR MORE tokens will be captured (an opponent may have several
+      //    tokens stacked on the same cell — every one of them must be captured & animated)
+      const capturedList: Array<{ playerIndex: number; tokenId: number; startStep: number }> = [];
+      const targetGlobalPos = getGlobalTrackPos(gameState.mode, activeIdx, finalStep);
 
-      // 3. Calculate reverse path for captured token back to home yard
-      const reverseSteps: number[] = [];
-      if (capturedInfo) {
-        for (let s = capturedInfo.startStep - 1; s >= 0; s--) {
-          reverseSteps.push(s);
-        }
-        reverseSteps.push(-1); // Back to Yard
+      if (targetGlobalPos !== null && !isSafeCell(gameState.mode, targetGlobalPos)) {
+        gameState.players.forEach((p, pIdx) => {
+          if (pIdx === activeIdx) return;
+          p.tokens.forEach((otherToken) => {
+            if (!otherToken.isFinished && otherToken.step >= 0) {
+              const otherGlobalPos = getGlobalTrackPos(gameState.mode, pIdx, otherToken.step);
+              if (otherGlobalPos === targetGlobalPos) {
+                capturedList.push({ playerIndex: pIdx, tokenId: otherToken.id, startStep: otherToken.step });
+              }
+            }
+          });
+        });
       }
+
+      // 3. Calculate reverse path back to yard for EACH captured token
+      const captureAnimations = capturedList.map((info) => {
+        const revSteps: number[] = [];
+        for (let s = info.startStep - 1; s >= 0; s--) {
+          revSteps.push(s);
+        }
+        revSteps.push(-1); // Back to Yard
+        return { info, revSteps };
+      });
 
       setIsAnimatingMove(true);
 
@@ -328,9 +353,7 @@ export default function App() {
       // 4. Step-by-step tile hopping forward animation
       for (let i = 0; i < forwardSteps.length; i++) {
         const currentStep = forwardSteps[i];
-        setOverrideTokenPos({
-          [`${activeIdx}_${tokenId}`]: { playerIndex: activeIdx, tokenId, step: currentStep },
-        });
+        setOverrideTokenPos([{ playerIndex: activeIdx, tokenId, step: currentStep }]);
 
         if (token.step === -1) {
           soundFx.playYardExit();
@@ -345,8 +368,9 @@ export default function App() {
         soundFx.playHomeFinish();
       }
 
-      // 5. Capture hit & step-by-step reverse path rewind animation
-      if (capturedInfo) {
+      // 5. Capture hit & step-by-step reverse path rewind animation — every captured
+      //    token rewinds home in parallel, so nothing is ever left stranded on the board
+      if (capturedList.length > 0) {
         soundFx.playCaptureHit();
         const capCenter = get4PTokenCenter(activeIdx, finalStep, tokenId);
         setCaptureEffectCell(capCenter);
@@ -356,37 +380,33 @@ export default function App() {
           setCaptureEffectCell(null);
         }, 2200);
 
-        const activeOverride = { playerIndex: activeIdx, tokenId, step: finalStep };
-        const totalRev = reverseSteps.length;
-        // Smooth bell curve trajectory: slow at start, quick in middle, slow at end
-        for (let j = 0; j < totalRev; j++) {
-          const revStep = reverseSteps[j];
-          setOverrideTokenPos({
-            [`${activeIdx}_${tokenId}`]: activeOverride,
-            [`${capturedInfo.playerIndex}_${capturedInfo.tokenId}`]: {
-              playerIndex: capturedInfo.playerIndex,
-              tokenId: capturedInfo.tokenId,
-              step: revStep,
-            },
-          });
+        await Promise.all(
+          captureAnimations.map(async ({ info, revSteps }) => {
+            const totalRev = revSteps.length;
+            for (let j = 0; j < totalRev; j++) {
+              const revStep = revSteps[j];
+              setOverrideTokenPos((prevOv) => {
+                const withoutThis = prevOv.filter(
+                  (o) => !(o.playerIndex === info.playerIndex && o.tokenId === info.tokenId)
+                );
+                return [...withoutThis, { playerIndex: info.playerIndex, tokenId: info.tokenId, step: revStep }];
+              });
 
-          // Normalized progress t between 0 and 1
-          const progress = totalRev > 1 ? j / (totalRev - 1) : 0.5;
-          // sin(PI * progress): 0 at start, 1 in middle, 0 at end
-          const speedFactor = Math.sin(Math.PI * progress);
+              const progress = totalRev > 1 ? j / (totalRev - 1) : 0.5;
+              const speedFactor = Math.sin(Math.PI * progress);
 
-          // Human-friendly smooth timing: start/end ~250ms delay, middle ~45ms delay
-          const maxDelay = 250;
-          const minDelay = 45;
-          const currentDelay = maxDelay - (maxDelay - minDelay) * speedFactor;
+              const maxDelay = 250;
+              const minDelay = 45;
+              const currentDelay = maxDelay - (maxDelay - minDelay) * speedFactor;
 
-          // Sound effect paced with movement
-          if (j % Math.max(1, Math.floor(1 / (speedFactor + 0.35))) === 0 || j === totalRev - 1) {
-            soundFx.playRewindStep();
-          }
+              if (j % Math.max(1, Math.floor(1 / (speedFactor + 0.35))) === 0 || j === totalRev - 1) {
+                soundFx.playRewindStep();
+              }
 
-          await new Promise((resolve) => setTimeout(resolve, currentDelay));
-        }
+              await new Promise((resolve) => setTimeout(resolve, currentDelay));
+            }
+          })
+        );
       }
 
       // 6. Finalize canonical game state FIRST before clearing override so active token stays fixed on finalStep
@@ -400,7 +420,7 @@ export default function App() {
 
       // Micro-tick delay to allow React state transition to complete before removing override
       await new Promise((resolve) => setTimeout(resolve, 50));
-      setOverrideTokenPos(null);
+      setOverrideTokenPos([]);
       setIsAnimatingMove(false);
     },
     [gameState, isAnimatingMove, updateStateAndSync]
@@ -444,6 +464,7 @@ export default function App() {
     setIsAnimatingMove(false);
     setOverrideTokenPos(null);
     setCaptureEffectCell(null);
+    setPlayerLastRolls({});
     setIsSetupOpen(false);
     setIsSettingsOpen(false);
 
@@ -584,22 +605,7 @@ export default function App() {
       </div>
       {/* HEADER BAR */}
       <header className="sticky top-0 z-40 bg-slate-900/90 border-b border-slate-800 backdrop-blur-md px-4 py-3 shadow-lg">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-2xl shadow-md text-white">
-              <Dices className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-black text-white tracking-tight">Ludo Web App</h1>
-                <span className="text-[10px] font-extrabold uppercase tracking-widest bg-emerald-950 text-emerald-400 border border-emerald-800/80 px-2 py-0.5 rounded-full">
-                  {gameState.mode} Mode
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400">Fair Dice • Live Server Sync • Auto-Bot Debug</p>
-            </div>
-          </div>
-
+        <div className="max-w-6xl mx-auto flex items-center justify-end">
           <div className="flex items-center gap-2">
             <button
               onClick={handleToggleMute}
@@ -657,6 +663,7 @@ export default function App() {
           captureEffectCell={captureEffectCell}
           isAnimating={isAnimatingMove}
           ghostImageUrl={ghostImageUrl}
+          playerLastRolls={playerLastRolls}
         />
       </main>
 
