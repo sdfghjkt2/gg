@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Remix Ludo Game</string>
+    <string name="title_activity_main">Remix Ludo Game</string>
+    <string name="package_name">com.ludoremix.app</string>
+    <string name="custom_url_scheme">com.ludoremix.app</string>
+</resources>

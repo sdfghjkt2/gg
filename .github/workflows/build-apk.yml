@@ -36,10 +36,10 @@ jobs:
         with:
           node-version: 20
 
-      - name: ☕ Set up Java Development Kit (JDK 17)
+      - name: ☕ Set up Java (JDK 17)
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: 'zulu'
           java-version: '17'
 
       - name: 📱 Set up Android SDK
@@ -53,50 +53,39 @@ jobs:
         run: |
           npm run build
 
-      - name: ⚡ Setup Expo CLI & EAS CLI
+      - name: 🤖 Initialize Capacitor Android Project
         run: |
-          npm install -g eas-cli expo-cli @expo/ngrok
+          npx cap add android || true
+          npx cap sync android
 
-      - name: 🏗️ Run Expo Prebuild & Generate Android Project
+      - name: 🔑 Grant execute permissions to Gradle
         run: |
-          npx expo prebuild --platform android --clean || true
+          chmod +x android/gradlew
 
-      - name: 🔨 Grant execute permissions for Gradle wrapper
+      - name: 🚀 Compile Android APK via Gradle
         run: |
-          if [ -f "android/gradlew" ]; then
-            chmod +x android/gradlew
-          fi
+          cd android
+          ./gradlew assembleDebug --stacktrace --no-daemon
+          cd ..
 
-      - name: 🚀 Build APK via Gradle
-        run: |
-          if [ -d "android" ]; then
-            cd android
-            ./gradlew assembleRelease --no-daemon || ./gradlew assembleDebug --no-daemon
-            cd ..
-          fi
-
-      - name: 🔍 Locate & Prepare APK
-        id: find_apk
+      - name: 🔍 Collect Output APK
+        id: collect_apk
         run: |
           mkdir -p build-output
-          APK_PATH=$(find . -name "*.apk" -not -path "*/node_modules/*" | head -n 1)
-          if [ -n "$APK_PATH" ] && [ -f "$APK_PATH" ]; then
-            echo "Found APK at: $APK_PATH"
-            cp "$APK_PATH" build-output/RemixLudoGame-release.apk
-            echo "apk_path=build-output/RemixLudoGame-release.apk" >> $GITHUB_OUTPUT
-            echo "apk_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "Creating standard bundled APK package..."
-            # Package standalone hybrid wrapper if native gradle is not run
-            zip -r build-output/RemixLudoGame-web-app.zip dist/
-            echo "apk_exists=false" >> $GITHUB_OUTPUT
+          APK_FILE=$(find android/app/build/outputs/apk/ -name "*.apk" | head -n 1)
+          if [ -z "$APK_FILE" ]; then
+            echo "❌ Error: No APK file was generated!"
+            exit 1
           fi
+          echo "✅ Found APK at: $APK_FILE"
+          cp "$APK_FILE" build-output/RemixLudoGame.apk
+          ls -lh build-output/RemixLudoGame.apk
 
-      - name: 📤 Upload APK Artifact to GitHub Action Run
+      - name: 📤 Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RemixLudoGame-APK
-          path: build-output/
+          name: RemixLudoGame-Android-APK
+          path: build-output/RemixLudoGame.apk
           retention-days: 30
 
       - name: 🏷️ Determine Release Tag
@@ -110,7 +99,7 @@ jobs:
             echo "tag=v1.0.${{ github.run_number }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: 📢 Create GitHub Release with APK
+      - name: 📢 Publish GitHub Release with APK
         if: github.event.inputs.create_release == true || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
@@ -119,15 +108,16 @@ jobs:
           body: |
             ## 🎲 Remix Ludo Game Android Release (${{ steps.release_version.outputs.tag }})
             
-            ### ✨ Features Included:
-            - **4-Player Turn-Based Dice**: Individual home dice positioned outside board corners with active aura and smooth rolling.
-            - **Offline & Online Play**: Real-time state persistence, smart bot AI debuggers, sound effects, and smooth board animations.
-            - **Fast Performance**: Optimized for Android devices & tablets.
+            ### ✨ What's included:
+            - **Native Standalone Android APK**: Ready to install directly on your Android phone or tablet.
+            - **Complete Game Features**: 4-Player Turn-Based Home Dice, live multiplayer sync, smart bot AI, sound effects, and animations.
             
-            ### 📲 Installation:
-            Download the attached `.apk` file below and open it on your Android smartphone or tablet to install.
+            ### 📲 How to Install:
+            1. Download the `RemixLudoGame.apk` file attached below to your Android device.
+            2. Tap the downloaded file to install (enable "Install unknown apps" if prompted).
+            3. Open and enjoy the game!
           files: |
-            build-output/*
+            build-output/RemixLudoGame.apk
           draft: false
           prerelease: false
         env:
