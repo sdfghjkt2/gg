@@ -45,6 +45,11 @@ jobs:
       - name: 📱 Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: 🐘 Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
       - name: 📦 Install Node dependencies
         run: |
           npm install --legacy-peer-deps
@@ -58,14 +63,13 @@ jobs:
           npx cap add android || true
           npx cap sync android
 
-      - name: 🔑 Grant execute permissions to Gradle
-        run: |
-          chmod +x android/gradlew
-
       - name: 🚀 Compile Android APK via Gradle
         run: |
           cd android
-          ./gradlew assembleDebug --stacktrace --no-daemon
+          # Re-generate fresh wrapper jar in runner if corrupted or missing
+          gradle wrapper --gradle-version 8.11.1 || true
+          chmod +x gradlew || true
+          ./gradlew assembleDebug --stacktrace --no-daemon || gradle assembleDebug --stacktrace --no-daemon
           cd ..
 
       - name: 🔍 Collect Output APK
