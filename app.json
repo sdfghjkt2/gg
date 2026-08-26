@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Remix Ludo Game",
-    "slug": "remix-ludo-game",
+    "name": "Ludo",
+    "slug": "ludo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

@@ -1,6 +1,6 @@
 {
   "appId": "com.ludoremix.app",
-  "appName": "Remix Ludo Game",
+  "appName": "Ludo",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {

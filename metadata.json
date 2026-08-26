@@ -1,5 +1,5 @@
 {
-  "name": "Remix Ludo Game",
+  "name": "Ludo",
   "description": "Interactive multi-mode Ludo game (4-player and 5-player) with smooth animations, server state auto-save persistence, fair uniform dice roll probability, auto-bot debug mode, and terminal logs.",
   "requestFramePermissions": [],
   "majorCapabilities": [

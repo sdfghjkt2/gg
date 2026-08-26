@@ -20,13 +20,34 @@ import { SetupModal } from './components/SetupModal';
 import { SettingsModal } from './components/SettingsModal';
 import { WinnerModal } from './components/WinnerModal';
 import { SafeSquaresModal } from './components/SafeSquaresModal';
-import { Settings, Play, Bot, RefreshCw, Sparkles, Dices, Volume2, VolumeX, Shield } from 'lucide-react';
+import { Settings, Play, Bot, RefreshCw, Sparkles, Dices, Volume2, VolumeX, Shield, ChevronUp, ChevronDown } from 'lucide-react';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRolling, setIsRolling] = useState<boolean>(false);
   const [playerLastRolls, setPlayerLastRolls] = useState<Record<number, number | null>>({});
+  const [boardOffsetY, setBoardOffsetY] = useState<number>(() => {
+    const saved = localStorage.getItem('ludo_board_offset_y');
+    return saved !== null ? parseInt(saved, 10) : 40;
+  });
+
+  // Direct Y-axis position shift for the entire board group (keeping dice, tokens & board 100% aligned)
+  const handleShiftY = (direction: 'up' | 'down') => {
+    setBoardOffsetY((prev) => {
+      const step = 40;
+      const next = direction === 'up' ? prev - step : prev + step;
+      // Allow fluid range between -300px and 600px
+      const clamped = Math.max(-300, Math.min(600, next));
+      localStorage.setItem('ludo_board_offset_y', clamped.toString());
+      return clamped;
+    });
+  };
+
+  const handleResetY = () => {
+    setBoardOffsetY(40);
+    localStorage.setItem('ludo_board_offset_y', '40');
+  };
 
   // Track each player's individual last roll for turn-based home dice
   useEffect(() => {
@@ -603,10 +624,15 @@ export default function App() {
         />
         <div className="absolute inset-0 bg-radial from-blue-600/10 via-transparent to-slate-950/80" />
       </div>
-      {/* HEADER BAR */}
-      <header className="sticky top-0 z-40 bg-slate-900/90 border-b border-slate-800 backdrop-blur-md px-4 py-3 shadow-lg">
-        <div className="max-w-6xl mx-auto flex items-center justify-end">
-          <div className="flex items-center gap-2">
+      {/* MAIN GAME CONTENT - Header buttons, board, home dice buttons all grouped together */}
+      <main className="flex-1 w-full overflow-hidden relative z-10 flex flex-col items-center">
+        {/* The entire grouped unit (New Game, Mute, Settings buttons, board, tokens, home dice buttons) shifts smoothly along the Y-axis */}
+        <div
+          className="max-w-6xl w-full mx-auto px-3 sm:px-6 pt-3 flex flex-col items-center gap-4 transition-transform duration-300 ease-out"
+          style={{ transform: `translateY(${boardOffsetY}px)` }}
+        >
+          {/* Top Control Bar (New Game, Sound, Auto-bot, Settings) aligned right above the board */}
+          <div className="w-full max-w-[620px] flex items-center justify-end gap-2 bg-slate-900/80 p-2 rounded-2xl border border-slate-800/80 shadow-lg backdrop-blur-md">
             <button
               onClick={handleToggleMute}
               className={`p-2.5 rounded-xl transition border flex items-center gap-1.5 ${
@@ -616,7 +642,7 @@ export default function App() {
               }`}
               title={isMuted ? 'Unmute Sound Effects' : 'Mute Sound Effects'}
             >
-              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
 
             <button
@@ -644,28 +670,52 @@ export default function App() {
               className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition border border-slate-700"
               title="Game Settings"
             >
-              <Settings className="w-5 h-5" />
+              <Settings className="w-4 h-4" />
             </button>
           </div>
-        </div>
-      </header>
 
-      {/* MAIN GAME CONTENT */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-6 flex flex-col items-center gap-5">
-        {/* Ludo Board */}
-        <Board4P
-          gameState={gameState}
-          validTokenIds={validTokenIds}
-          onTokenClick={handleSelectToken}
-          onRollDice={handleRollDice}
-          isRolling={isRolling}
-          overrideTokenPos={overrideTokenPos}
-          captureEffectCell={captureEffectCell}
-          isAnimating={isAnimatingMove}
-          ghostImageUrl={ghostImageUrl}
-          playerLastRolls={playerLastRolls}
-        />
+          {/* Ludo Board with completely unified buttons and layout */}
+          <Board4P
+            gameState={gameState}
+            validTokenIds={validTokenIds}
+            onTokenClick={handleSelectToken}
+            onRollDice={handleRollDice}
+            isRolling={isRolling}
+            overrideTokenPos={overrideTokenPos}
+            captureEffectCell={captureEffectCell}
+            isAnimating={isAnimatingMove}
+            ghostImageUrl={ghostImageUrl}
+            playerLastRolls={playerLastRolls}
+          />
+        </div>
       </main>
+
+      {/* Floating Small Up and Down Arrow Signs in Bottom Right Corner */}
+      <div className="fixed bottom-4 right-4 z-40 flex flex-col items-center gap-1.5 p-1 bg-slate-900/90 border border-slate-700/80 rounded-2xl shadow-xl backdrop-blur-md">
+        <button
+          onClick={() => handleShiftY('up')}
+          className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white transition shadow border border-slate-700/50 flex items-center justify-center group"
+          title="Move Board Group Up"
+          aria-label="Move Board Group Up"
+        >
+          <ChevronUp className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform text-slate-200" />
+        </button>
+        <button
+          onClick={handleResetY}
+          className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-slate-800/70 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition"
+          title="Reset Board Position"
+        >
+          {boardOffsetY}px
+        </button>
+        <button
+          onClick={() => handleShiftY('down')}
+          className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white transition shadow border border-slate-700/50 flex items-center justify-center group"
+          title="Move Board Group Down"
+          aria-label="Move Board Group Down"
+        >
+          <ChevronDown className="w-4 h-4 group-hover:translate-y-0.5 transition-transform text-slate-200" />
+        </button>
+      </div>
 
       {/* MODALS */}
       <SetupModal
