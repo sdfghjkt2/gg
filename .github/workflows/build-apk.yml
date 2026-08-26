@@ -69,10 +69,11 @@ jobs:
       - name: 🚀 Compile Android APK via Gradle
         run: |
           cd android
+          rm -rf ~/.gradle/caches
           rm -rf ~/.gradle/wrapper/dists
           gradle wrapper --gradle-version 8.14.3
           chmod +x gradlew
-          ./gradlew clean assembleDebug --stacktrace --no-daemon
+          ./gradlew clean assembleDebug --refresh-dependencies --stacktrace --no-daemon
           cd ..
 
       - name: 🔍 Collect Output APK
