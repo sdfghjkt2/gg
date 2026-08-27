@@ -1,14 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <!-- Background Gradient -->
-    <radialGradient id="bgGrad" cx="50%" cy="30%" r="70%">
+    <radialGradient id="bgGrad" cx="50%" cy="30%" r="75%">
       <stop offset="0%" stop-color="#1e293b"/>
-      <stop offset="100%" stop-color="#090d16"/>
+      <stop offset="60%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
     </radialGradient>
 
     <!-- Quadrant Gradients -->
     <linearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ff4b68"/>
+      <stop offset="0%" stop-color="#ff4365"/>
       <stop offset="100%" stop-color="#dc2626"/>
     </linearGradient>
     <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -34,7 +35,7 @@
     <!-- Dice 3D Gradients -->
     <linearGradient id="diceTop" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#f1f5f9"/>
+      <stop offset="100%" stop-color="#f8fafc"/>
     </linearGradient>
     <linearGradient id="diceFront" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#e2e8f0"/>
@@ -46,56 +47,56 @@
     </linearGradient>
 
     <!-- Drop Shadows -->
-    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#000000" flood-opacity="0.6"/>
+    <filter id="dropShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000000" flood-opacity="0.65"/>
     </filter>
-    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="8" result="blur"/>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
       <feComposite in="SourceGraphic" in2="blur" operator="over"/>
     </filter>
   </defs>
 
-  <!-- Base Icon Squircle Background -->
+  <!-- Base Icon Background -->
   <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
-  <rect width="504" height="504" x="4" y="4" rx="108" fill="none" stroke="url(#goldGrad)" stroke-width="4" opacity="0.6"/>
+  <rect width="502" height="502" x="5" y="5" rx="107" fill="none" stroke="url(#goldGrad)" stroke-width="4" opacity="0.65"/>
 
   <!-- Inner Board Frame -->
   <g filter="url(#dropShadow)">
-    <rect x="76" y="76" width="360" height="360" rx="36" fill="#0f172a" stroke="#334155" stroke-width="6"/>
+    <rect x="76" y="76" width="360" height="360" rx="32" fill="#0b1120" stroke="#334155" stroke-width="6"/>
     
     <!-- Quadrant Blocks -->
     <!-- Red (Top-Left) -->
-    <rect x="94" y="94" width="144" height="144" rx="20" fill="url(#redGrad)"/>
+    <rect x="94" y="94" width="144" height="144" rx="18" fill="url(#redGrad)"/>
     <circle cx="166" cy="166" r="42" fill="#ffffff" opacity="0.95"/>
     <circle cx="166" cy="166" r="28" fill="#dc2626"/>
     <circle cx="166" cy="166" r="14" fill="#fee2e2"/>
 
     <!-- Green (Top-Right) -->
-    <rect x="274" y="94" width="144" height="144" rx="20" fill="url(#greenGrad)"/>
+    <rect x="274" y="94" width="144" height="144" rx="18" fill="url(#greenGrad)"/>
     <circle cx="346" cy="166" r="42" fill="#ffffff" opacity="0.95"/>
     <circle cx="346" cy="166" r="28" fill="#059669"/>
     <circle cx="346" cy="166" r="14" fill="#d1fae5"/>
 
     <!-- Yellow (Bottom-Left) -->
-    <rect x="94" y="274" width="144" height="144" rx="20" fill="url(#yellowGrad)"/>
+    <rect x="94" y="274" width="144" height="144" rx="18" fill="url(#yellowGrad)"/>
     <circle cx="166" cy="346" r="42" fill="#ffffff" opacity="0.95"/>
     <circle cx="166" cy="346" r="28" fill="#d97706"/>
     <circle cx="166" cy="346" r="14" fill="#fef3c7"/>
 
     <!-- Blue (Bottom-Right) -->
-    <rect x="274" y="274" width="144" height="144" rx="20" fill="url(#blueGrad)"/>
+    <rect x="274" y="274" width="144" height="144" rx="18" fill="url(#blueGrad)"/>
     <circle cx="346" cy="346" r="42" fill="#ffffff" opacity="0.95"/>
     <circle cx="346" cy="346" r="28" fill="#2563eb"/>
     <circle cx="346" cy="346" r="14" fill="#dbeafe"/>
 
     <!-- Central Diamond / Home Hub -->
-    <polygon points="256,196 316,256 256,316 196,256" fill="#090d16" stroke="url(#goldGrad)" stroke-width="6"/>
+    <polygon points="256,196 316,256 256,316 196,256" fill="#090d16" stroke="url(#goldGrad)" stroke-width="5"/>
   </g>
 
   <!-- Centered 3D Glossy Dice with 6 Pips & Gold Accents -->
   <g filter="url(#dropShadow)" transform="translate(256,256) scale(0.95) translate(-256,-256)">
     <!-- Dice Shadow -->
-    <ellipse cx="256" cy="326" rx="72" ry="24" fill="#000000" opacity="0.5"/>
+    <ellipse cx="256" cy="326" rx="72" ry="24" fill="#000000" opacity="0.55"/>
 
     <!-- 3D Isometric Cube Dice -->
     <!-- Top Face (Showing 1 Red Royal Star/Pip) -->

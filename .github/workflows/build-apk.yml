@@ -86,14 +86,15 @@ jobs:
             exit 1
           fi
           echo "✅ Found APK at: $APK_FILE"
+          cp "$APK_FILE" build-output/Ludo.apk
           cp "$APK_FILE" build-output/RemixLudoGame.apk
-          ls -lh build-output/RemixLudoGame.apk
+          ls -lh build-output/
 
       - name: 📤 Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RemixLudoGame-Android-APK
-          path: build-output/RemixLudoGame.apk
+          name: Ludo-Android-APK
+          path: build-output/Ludo.apk
           retention-days: 30
 
       - name: 🏷️ Determine Release Tag
@@ -112,19 +113,20 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release_version.outputs.tag }}
-          name: Remix Ludo Game ${{ steps.release_version.outputs.tag }}
+          name: Ludo ${{ steps.release_version.outputs.tag }}
           body: |
-            ## 🎲 Remix Ludo Game Android Release (${{ steps.release_version.outputs.tag }})
+            ## 🎲 Ludo Android Release (${{ steps.release_version.outputs.tag }})
             
             ### ✨ What's included:
-            - **Native Standalone Android APK**: Ready to install directly on your Android phone or tablet.
+            - **Native Standalone Android APK**: Ready to install directly on your Android phone or tablet with high-res launcher icon and splash screen.
             - **Complete Game Features**: 4-Player Turn-Based Home Dice, live multiplayer sync, smart bot AI, sound effects, and animations.
             
             ### 📲 How to Install:
-            1. Download the `RemixLudoGame.apk` file attached below to your Android device.
+            1. Download the `Ludo.apk` file attached below to your Android device.
             2. Tap the downloaded file to install (enable "Install unknown apps" if prompted).
             3. Open and enjoy the game!
           files: |
+            build-output/Ludo.apk
             build-output/RemixLudoGame.apk
           draft: false
           prerelease: false
