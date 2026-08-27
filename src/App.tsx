@@ -690,8 +690,8 @@ export default function App() {
         </div>
       </main>
 
-      {/* Floating Small Up and Down Arrow Signs in Bottom Right Corner */}
-      <div className="fixed bottom-4 right-4 z-40 flex flex-col items-center gap-1.5 p-1 bg-slate-900/90 border border-slate-700/80 rounded-2xl shadow-xl backdrop-blur-md">
+      {/* Floating Small Up and Down Arrow Signs in Bottom Right Corner (shifted ~40px higher) */}
+      <div className="fixed bottom-14 right-4 z-40 flex flex-col items-center gap-1.5 p-1 bg-slate-900/90 border border-slate-700/80 rounded-2xl shadow-xl backdrop-blur-md">
         <button
           onClick={() => handleShiftY('up')}
           className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 active:scale-95 text-slate-300 hover:text-white transition shadow border border-slate-700/50 flex items-center justify-center group"
